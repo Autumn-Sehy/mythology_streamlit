@@ -67,7 +67,7 @@ with st.sidebar:
     selected_culture   = st.selectbox("🏛️ Filter by Culture",   ["All"] + all_cultures,   key="culture_select")
     selected_creature  = st.selectbox("🦊 Filter by Creature",  ["All"] + all_species,    key="creature_select")
 
-query = st.text_input(""Use the sidebar on the left to filter further by creature, continent, or culture."", key="query_input")
+query = st.text_input("Use the sidebar on the left to filter further by creature, continent, or culture.", key="query_input")
 
 if query:
     q_vec  = model.encode([query])
