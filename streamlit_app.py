@@ -53,6 +53,7 @@ def fetch_story_from_s3(continent, culture, filename):
 # === UI ===
 st.title("🔍 Mythology Story Search")
 st.markdown("Search across folklore stories by meaning, species, culture, or emotion.")
+st.markdown("Use the sidebar on the left to filter by creature, continent, or culture.")
 
 
 index, metadata, model = load_index()
