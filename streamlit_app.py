@@ -53,7 +53,6 @@ def fetch_story_from_s3(continent, culture, filename):
 # === UI ===
 st.title("🔍 Mythology Story Search")
 st.markdown("Search across folklore stories by meaning, species, culture, or emotion.")
-st.markdown("Use the sidebar on the left to filter by creature, continent, or culture.")
 
 
 index, metadata, model = load_index()
@@ -68,7 +67,7 @@ with st.sidebar:
     selected_culture   = st.selectbox("🏛️ Filter by Culture",   ["All"] + all_cultures,   key="culture_select")
     selected_creature  = st.selectbox("🦊 Filter by Creature",  ["All"] + all_species,    key="creature_select")
 
-query = st.text_input(key="query_input")
+query = st.text_input(""Use the sidebar on the left to filter further by creature, continent, or culture."", key="query_input")
 
 if query:
     q_vec  = model.encode([query])
