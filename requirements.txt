@@ -1,5 +1,10 @@
 streamlit
-sentence-transformers
-faiss-cpu
-numpy
 boto3
+numpy
+pandas
+torch
+torchaudio
+librosa
+transformers
+umap-learn
+plotly
