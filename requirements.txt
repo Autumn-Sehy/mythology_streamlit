@@ -8,3 +8,8 @@ librosa
 transformers
 umap-learn
 plotly
+faiss
+json
+os
+botocore
+sentence_transformers
