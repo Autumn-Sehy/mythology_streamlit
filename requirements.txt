@@ -1,12 +1,6 @@
+
 streamlit
-boto3
-numpy
-pandas
-torch
-torchaudio
-librosa
-transformers
-umap-learn
-plotly
-faiss-cpu==1.7.4
 sentence-transformers
+faiss-cpu
+numpy
+boto3
