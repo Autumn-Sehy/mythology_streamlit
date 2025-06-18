@@ -116,7 +116,6 @@ if query:
             f"*Culture:* **{story['culture']}**   |   "
             f"*Continent:* **{story['continent']}**"
         )
-        st.markdown(f"*Similarity Score:* `{score:.2f}`")
 
         if "emotion_pred_top3" in story:
             emotions = ", ".join(e["label"] for e in story["emotion_pred_top3"])
