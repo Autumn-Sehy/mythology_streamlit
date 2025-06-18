@@ -12,7 +12,7 @@ DB_DIR          = "vector_db"            # local cache for index & metadata
 S3_BUCKET       = "mythdatabase"         # your S3 bucket name
 S3_PREFIX       = "stories"              # prefix where .txt files live
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
-TOP_K           = 10
+RESULTS_PER_PAGE = 10
 
 # === AWS S3 CLIENT (uses Streamlit secrets) ===
 s3 = boto3.client(
@@ -54,7 +54,6 @@ def fetch_story_from_s3(continent, culture, filename):
 st.title("🔍 Mythology Story Search")
 st.markdown("Search across folklore stories by meaning, species, culture, or emotion.")
 
-
 index, metadata, model = load_index()
 
 # sidebar filters --> I want to move these eventually :)
@@ -70,14 +69,16 @@ with st.sidebar:
 query = st.text_input("Use the sidebar on the left to filter further by creature, continent, or culture.", key="query_input")
 
 if query:
-    q_vec  = model.encode([query])
-    scores, indices = index.search(np.array(q_vec), k=TOP_K)
+    q_vec = model.encode([query])
+    # Search the whole database first, then filter after for accurate pagination
+    scores, indices = index.search(np.array(q_vec), k=len(metadata))
+    scored_items = [(score, idx) for score, idx in zip(scores[0], indices[0])]
 
-    st.subheader("🧠 Top Matching Stories")
-    for i, (score, idx) in enumerate(zip(scores[0], indices[0])):
+    # Apply filters
+    filtered_results = []
+    for score, idx in scored_items:
         story = metadata[idx]
 
-        # apply filters
         if selected_continent != "All" and story.get("continent") != selected_continent:
             continue
         if selected_culture != "All" and story.get("culture") != selected_culture:
@@ -86,8 +87,27 @@ if query:
             if "species_mentions" not in story or selected_creature not in story["species_mentions"]:
                 continue
 
-        # display summary
-        st.markdown(f"### 📜 {story['filename']}")
+        filtered_results.append((score, idx))
+
+    total_results = len(filtered_results)
+    total_pages = max(1, (total_results - 1) // RESULTS_PER_PAGE + 1)
+
+    # Pagination control: arrow buttons and page number
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        current_page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1, key="page_number")
+
+    # Show total results and page info
+    st.markdown(f"**Total Matches:** {total_results} &nbsp;&nbsp; | &nbsp;&nbsp; Page **{current_page}** of **{total_pages}**")
+
+    start_idx = (current_page - 1) * RESULTS_PER_PAGE
+    end_idx = start_idx + RESULTS_PER_PAGE
+
+    st.subheader("🧠 Matching Stories")
+    for i, (score, idx) in enumerate(filtered_results[start_idx:end_idx], start=start_idx+1):
+        story = metadata[idx]
+
+        st.markdown(f"#### {i}. 📜 {story['filename']}")
         st.markdown(
             f"*Culture:* **{story['culture']}**   |   "
             f"*Continent:* **{story['continent']}**"
@@ -102,7 +122,6 @@ if query:
             species_list = list(story["species_mentions"].keys())
             st.markdown(f"**Species Mentioned:** {', '.join(species_list)}")
 
-        # read story button :)
         if st.button("📖 Read story", key=f"read_{idx}_{i}"):
             full_text = fetch_story_from_s3(story["continent"], story["culture"], story["filename"])
             if full_text:
@@ -111,3 +130,4 @@ if query:
                 st.error("Couldn't load story from S3.")
 
         st.markdown("---")
+
