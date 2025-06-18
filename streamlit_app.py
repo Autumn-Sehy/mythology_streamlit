@@ -8,13 +8,14 @@ import botocore
 from sentence_transformers import SentenceTransformer
 
 # === CONFIGURATION ===
-DB_DIR          = "vector_db"            # local cache for index & metadata
-S3_BUCKET       = "mythdatabase"         # your S3 bucket name
-S3_PREFIX       = "stories"              # prefix where .txt files live
+DB_DIR          = "vector_db"
+S3_BUCKET       = "mythdatabase"
+S3_PREFIX       = "stories"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 RESULTS_PER_PAGE = 10
+MAX_PAGES = 50
 
-# === AWS S3 CLIENT (uses Streamlit secrets) ===
+# === AWS S3 CLIENT ===
 s3 = boto3.client(
     "s3",
     aws_access_key_id=st.secrets["AWS_ACCESS_KEY_ID"],
@@ -24,9 +25,7 @@ s3 = boto3.client(
 
 @st.cache_resource
 def load_index():
-    # ensure local cache folder
     os.makedirs(DB_DIR, exist_ok=True)
-    # download vector DB files if missing
     for fname in ["stories.index", "metadata.json"]:
         local_path = os.path.join(DB_DIR, fname)
         if not os.path.exists(local_path):
@@ -56,7 +55,7 @@ st.markdown("Search across folklore stories by meaning, species, culture, or emo
 
 index, metadata, model = load_index()
 
-# sidebar filters --> I want to move these eventually :)
+# sidebar filters
 all_continents = sorted({m["continent"] for m in metadata if "continent" in m})
 all_cultures   = sorted({m["culture"]   for m in metadata if "culture"   in m})
 all_species    = sorted({sp for m in metadata if "species_mentions" in m for sp in m["species_mentions"].keys()})
@@ -68,9 +67,20 @@ with st.sidebar:
 
 query = st.text_input("Use the sidebar on the left to filter further by creature, continent, or culture.", key="query_input")
 
+# Session state for pagination
+if "current_page" not in st.session_state:
+    st.session_state.current_page = 1
+
+def go_next(total_pages):
+    if st.session_state.current_page < total_pages:
+        st.session_state.current_page += 1
+
+def go_prev():
+    if st.session_state.current_page > 1:
+        st.session_state.current_page -= 1
+
 if query:
     q_vec = model.encode([query])
-    # Search the whole database first, then filter after for accurate pagination
     scores, indices = index.search(np.array(q_vec), k=len(metadata))
     scored_items = [(score, idx) for score, idx in zip(scores[0], indices[0])]
 
@@ -90,21 +100,15 @@ if query:
         filtered_results.append((score, idx))
 
     total_results = len(filtered_results)
-    total_pages = max(1, (total_results - 1) // RESULTS_PER_PAGE + 1)
+    total_pages = min(MAX_PAGES, max(1, (total_results - 1) // RESULTS_PER_PAGE + 1))
 
-    # Pagination control: arrow buttons and page number
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        current_page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1, key="page_number")
-
-    # Show total results and page info
-    st.markdown(f"**Total Matches:** {total_results} &nbsp;&nbsp; | &nbsp;&nbsp; Page **{current_page}** of **{total_pages}**")
-
-    start_idx = (current_page - 1) * RESULTS_PER_PAGE
+    start_idx = (st.session_state.current_page - 1) * RESULTS_PER_PAGE
     end_idx = start_idx + RESULTS_PER_PAGE
 
     st.subheader("🧠 Matching Stories")
-    for i, (score, idx) in enumerate(filtered_results[start_idx:end_idx], start=start_idx+1):
+    st.markdown(f"**Total Matches:** {total_results} &nbsp;&nbsp; | &nbsp;&nbsp; Page **{st.session_state.current_page}** of **{total_pages}**")
+
+    for i, (score, idx) in enumerate(filtered_results[start_idx:end_idx], start=start_idx + 1):
         story = metadata[idx]
 
         st.markdown(f"#### {i}. 📜 {story['filename']}")
@@ -131,3 +135,11 @@ if query:
 
         st.markdown("---")
 
+    # === PAGINATION CONTROLS AT BOTTOM ===
+    col1, col2, col3 = st.columns([1,2,1])
+    with col1:
+        if st.button("⬅️ Previous", disabled=st.session_state.current_page <= 1):
+            go_prev()
+    with col3:
+        if st.button("Next ➡️", disabled=st.session_state.current_page >= total_pages):
+            go_next(total_pages)
